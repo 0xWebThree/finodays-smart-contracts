@@ -62,33 +62,28 @@ contract TToken is ERC20 {
         uint256 countryCode,
         address productOracle,
         address factory,
-        uint256[] memory prices,
+        uint256[] memory resourceIds,
         uint256[] memory balances
     ) ERC20(name, symbol) {
         require(countryCode != 0, "TToken: There is no country with zero code");
         require(productOracle != address(0), "TToken: Oracle address must be initialized");
         require(factory != address(0), "TToken: Factory address must be initialized");
         
-        uint256 productsLen = prices.length;
+        uint256 productsLen = balances.length;
         require(productsLen != 0, "TToken: zero length of price array for nomenclature of products");
-        require(productsLen == balances.length, "TToken: length of balance and price arrays must be equal");
+        require(productsLen == resourceIds.length, "TToken: length of resourceIds and price arrays must be equal");
 
         _countryCode = countryCode;
         _productOracle = IOracle(productOracle);
         _factory = factory;
         uint256 i;
         for(i; i<productsLen; i++) {
-            require(
-                prices[i] != 0, 
-                "TToken: price for product in nomenclature mustn'be zero"
-            );
-            _productOracle.setProductPrice(i, prices[i]);
-
+            uint256 resourceId = resourceIds[i];
             require(
                 balances[i] != 0, 
                 "TToken: balance for product in nomenclature mustn'be zero"
             );
-            _nomenclatureResources[i] = balances[i];
+            _nomenclatureResources[resourceId] = balances[i];
         }
         _totalProductsInNomenclature = productsLen;
     }

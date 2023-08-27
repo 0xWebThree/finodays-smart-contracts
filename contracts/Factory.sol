@@ -12,13 +12,18 @@ contract Factory {
     // Country Code => address
     mapping(uint256 => TradePair) private _tradePair;
 
-    event tradePairCreated(address token, address oracle);
+    event TradePairCreated(
+        uint256 indexed countryCode, 
+        address token, 
+        address oracle
+    );
 
     function createTradePair(
-        string memory name, 
-        string memory symbol,
+        string calldata name, 
+        string calldata symbol,
         uint256 countryCode,
         address system,
+        uint256[] calldata resourceIds,
         uint256[] calldata prices,
         uint256[] calldata balances
     ) external {
@@ -27,26 +32,26 @@ contract Factory {
             "Factory: TToken contract is already created with specified country code"
         );
 
-        address oracle = _createOracleContract(system);
+        address oracle = _createOracleContract(system, resourceIds, prices);
         address token = _createTokenContract(
             name, 
             symbol, 
             countryCode, 
             oracle, 
-            prices,
+            resourceIds,
             balances
         );
         _tradePair[countryCode] = TradePair(token, oracle);
 
-        emit tradePairCreated(token, oracle); 
+        emit TradePairCreated(countryCode, token, oracle); 
     }
 
     function _createTokenContract(
-        string memory name, 
-        string memory symbol,
+        string calldata name, 
+        string calldata symbol,
         uint256 countryCode,
         address oracle,
-        uint256[] calldata prices,
+        uint256[] calldata resourceIds,
         uint256[] calldata balances
     ) 
         internal returns(address) 
@@ -57,18 +62,22 @@ contract Factory {
             countryCode,
             oracle,
             address(this),
-            prices,
+            resourceIds,
             balances
         );
         return address(newTTokenContract);
     }
 
-    function _createOracleContract(address system) 
+    function _createOracleContract(
+        address system, 
+        uint256[] calldata resourceIds, 
+        uint256[] calldata prices
+    ) 
        internal 
        returns(address) 
     {
         Oracle newOracleContract = new Oracle(
-            system
+            system, resourceIds, prices
         );
         return address(newOracleContract);
     }
