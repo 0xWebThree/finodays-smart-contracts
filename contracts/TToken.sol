@@ -5,46 +5,43 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./../interfaces/IOracle.sol";
 
 /*
-Создание торговых токенов
-Фабрика смартов(добавление других компаний [регистрация компании(по коду компании), его токена])
-
-
-по кажд стране
-приобрет за валюту
-
-fix цена (изменение через оракул будет, через функцию)
-getPrice() из смарта оракула, получаем рейт (грубо говоря) => минтим в соотв с рейтом
-
-страна мож создавать свои товары, ордер
+Смарт-контракт торгового токена, создается фабрикой
 */
 
-// товарный токен
+// Товарный токен
 contract TToken is ERC20 {
     // ISO code: http://www.davros.org/misc/iso3166.html
     uint256 immutable private _countryCode;
     
-    struct Product {
-        uint256 price;
-        uint256 balance;
-    }
-    mapping(uint256 => Product) _countryNomenclature;
+    // код биржевого товара => balance
+    mapping(uint256 => uint256) _nomenclatureResources;
     uint256 private _totalProductsInNomenclature;
 
     IOracle immutable internal _productOracle;
     address immutable internal _factory;
 
-    enum Status { InProgress, Completed }
+    enum OperationCode { TopUp, Transfer, Swap, Withdraw }
+    /*
+     * all operation statuses will be 'Completed' in MVP
+     * as if the verification oracle has worked
+     */
+    enum OperationStatus {Created, InProgress, Completed }
     struct Operation {
         uint256 fromCompany;
         uint256 toCompany;
-        uint256 operationCode;
-        Status status;
-        uint256 subjectCode;  // code of country product || company's product(like TVs)
+        OperationCode operationCode;
+        OperationStatus status;
+        uint256 subjectCode;  // code of nomen. resource || company's product(like TVs)
         uint256 subjectAmount;
         uint256 ttokensAmount;
         uint256 timestamp;
     }
-    mapping(uint256 => Operation) private _operations;
+    /* @note After mvp will be deprecated in favor of event listener
+     * _operationsIn - top up only in ttoken
+     * _operationsOut - withdrawal only in ttoken
+     */
+    mapping(address => Operation[]) private _operationsIn;
+    mapping(address => Operation[]) private _operationsOut;
     
     struct Company {
        string name;
@@ -53,6 +50,11 @@ contract TToken is ERC20 {
     // Company code => Company info
     mapping(uint256 => Company) private _company;
     uint256 private _totalCompanies;
+
+    modifier onlyCompany(uint256 companyId) {
+        require(_company[companyId].mainAddress == _msgSender());
+        _;
+    }
 
     constructor(
         string memory name, 
@@ -80,33 +82,83 @@ contract TToken is ERC20 {
                 prices[i] != 0, 
                 "TToken: price for product in nomenclature mustn'be zero"
             );
+            _productOracle.setProductPrice(i, prices[i]);
+
             require(
                 balances[i] != 0, 
                 "TToken: balance for product in nomenclature mustn'be zero"
             );
-            _countryNomenclature[i] = Product(prices[i], balances[i]);
+            _nomenclatureResources[i] = balances[i];
         }
         _totalProductsInNomenclature = productsLen;
     }
 
+    // No zero company, zero company for administrative use
     function addCompany(string calldata name) external {
-        _company[_totalCompanies] = Company(name, _msgSender());
         ++ _totalCompanies;
+        _company[_totalCompanies] = Company(name, _msgSender());
     }
 
-    function setOperationAsComplete() external {
+    // simulation 
+    // due to the fact that, as for mvp, we can't work with real assets
+    function topUpBalance(
+        uint256 companyId, 
+        uint256 nationalCurrency,  // to pay
+        uint256 resourceId         // to find out rate for exchange
+    ) 
+        external 
+        onlyCompany(companyId)
+    {
+        uint256 rate = getProductPrice(resourceId);
+        uint256 toMint = (rate * nationalCurrency) / _productOracle.decimals();
+        
+        _mint(_msgSender(), toMint);
+        _operationsIn[_msgSender()].push( 
+            Operation(
+                0, 
+                companyId, 
+                OperationCode.TopUp, 
+                OperationStatus.Completed, 
+                resourceId, 
+                nationalCurrency, 
+                toMint, 
+                block.timestamp
+            )
+        );
+    }
 
+    // TToken sell
+    function withdraw(
+        uint256 companyId,
+        uint256 ttokens, 
+        uint256 resourceId
+    )
+        external
+        onlyCompany(companyId)
+    {
+        uint256 rate = getProductPrice(resourceId);
+        uint256 topUpInCurrency = (_productOracle.decimals() * ttokens) / rate;
+
+        _burn(_msgSender(), ttokens);
+        _operationsOut[_msgSender()].push( 
+            Operation(
+                companyId, 
+                0, 
+                OperationCode.Withdraw, 
+                OperationStatus.Completed, 
+                resourceId, 
+                topUpInCurrency, 
+                ttokens, 
+                block.timestamp
+            )
+        );
     }
 
     function getProductPrice(uint256 productId) 
         public view 
         returns (uint256) 
     {
-        return _productOracle.getProductPrice(productId);
-    }
-
-    function burn(uint256 amount) external {
-        super._burn(_msgSender(), amount);
+        return _productOracle.getProductPriceById(productId);
     }
 
     function getCountryCode() public view returns(uint256) {

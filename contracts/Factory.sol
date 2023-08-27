@@ -12,11 +12,6 @@ contract Factory {
     // Country Code => address
     mapping(uint256 => TradePair) private _tradePair;
 
-    struct Product {
-        uint256 price;
-        uint256 balance;
-    }
-
     event tradePairCreated(address token, address oracle);
 
     function createTradePair(
@@ -76,5 +71,22 @@ contract Factory {
             system
         );
         return address(newOracleContract);
+    }
+
+    function getTokenAddressByCountryCode(
+        uint256 countryCode
+    ) 
+        external view 
+        returns(address) 
+    {
+        return _tradePair[countryCode].token;
+    }
+    function getOracleAddressByCountryCode(
+        uint256 countryCode
+    ) 
+        external view 
+        returns(address) 
+    {
+        return _tradePair[countryCode].oracle;
     }
 }
