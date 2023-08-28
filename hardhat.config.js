@@ -1,6 +1,7 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomiclabs/hardhat-etherscan");
 require('hardhat-docgen');
+require('solidity-coverage')
 
 const fs = require('fs');
 
@@ -16,6 +17,7 @@ module.exports = {
         enabled: true,
         runs: 200,
       },
+      viaIR: true,
     },
   },
   networks: {

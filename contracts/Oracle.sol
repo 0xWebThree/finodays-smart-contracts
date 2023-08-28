@@ -11,6 +11,8 @@ import "../interfaces/IOracle.sol";
 contract Oracle is IOracle, Ownable {
     mapping(uint256 => uint256) private _productPrice;
 
+    event PriceChange(uint256 indexed productId, uint256 oldPrice, uint256 newPrice);
+
     constructor(
         address system, 
         uint256[] memory resourceIds,  
@@ -42,7 +44,11 @@ contract Oracle is IOracle, Ownable {
         public 
         onlyOwner 
     {
+        uint256 price = _productPrice[productId];
+        require(price != 0, "Oracle: unappropriate productId");
+        
         _productPrice[productId] = newProductPrice;
+        emit PriceChange(productId, price, newProductPrice);
     }
 
     // Fixed number for mvp

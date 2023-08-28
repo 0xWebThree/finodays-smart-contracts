@@ -37,3 +37,4 @@ npx hardhat docgen
 ```bash
 npx hardhat docgen --no-compile
 ```
+

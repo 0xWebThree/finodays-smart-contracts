@@ -12,32 +12,15 @@ const resourceIds1 = [1, 3, 4, 5]
 const prices1 = [20, 30, 10, 5]
 const balances1 = [5, 10, 30, 40]
 
-const name2 = "TTChina"
-const symbol2 = "TTC"
-const countryCode2 = 156
-// золото металлы 
-const resourceIds2 = [1, 2]
-const prices2 = [50, 100]
-const balances2 = [1000, 2000]
-
-const name3 = "TTIndia"
-const symbol3 = "TTI"
-const countryCode3 = 356
-// золото нефть газ
-const resourceIds3 = [1, 3, 4]
-const prices3 = [10, 20, 5]
-const balances3 = [10, 5, 2]
-
-
-describe("TToken", function () {
+describe("Factory", function () {
     async function deployFactoryFixture() {
         const factory = await ethers.deployContract("Factory");
     
         await factory.waitForDeployment;
         return factory
     }
-    describe("Functionality", function () {
-        it("Deploy & initial params check", async function () {
+    describe("Funcionality", function () {
+        it("Deploy check", async function () {
           const factory = await loadFixture(deployFactoryFixture);
           
           expect(
@@ -74,4 +57,3 @@ describe("TToken", function () {
         });
     });
 });
-
