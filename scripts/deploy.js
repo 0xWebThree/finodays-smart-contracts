@@ -43,8 +43,8 @@ async function main() {
       resourceIds1, 
       prices1, 
       balances1
-    )
-    await factory
+    ) 
+  await factory
     .createTradePair(
       name2,
       symbol2, 

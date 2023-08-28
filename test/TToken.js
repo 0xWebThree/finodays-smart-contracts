@@ -84,8 +84,7 @@ describe("TToken", function () {
           await factory.getTokenAddressByCountryCode(countryCode3), 
           contractABI, 
           addrIndia
-      );
-        
+       );
         return { factory, token1, token2, token3, addrRussia, addrChina, addrIndia, system }
     }
     describe("Basic functionality", function () {

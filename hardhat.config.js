@@ -31,7 +31,10 @@ module.exports = {
     path: './docs',
     clear: true,
     runOnCompile: true,
-  }
+  },
+  etherscan: {
+    apiKey: "5H4X194822537WKSNVX5SMUWXBXK3GN6DD",
+  },
 };
 
 
