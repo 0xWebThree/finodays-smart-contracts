@@ -39,8 +39,8 @@ contract TToken is TERC, ITToken {
         Completed
     }
     struct Operation {
-        uint256 fromCompany;
-        uint256 toCompany;
+        address from;
+        address to;
         OperationCode operationCode;
         OperationStatus status;
         uint256 subjectCode; // if TTokens = 0 || code of nomen. resource || company's product(like TVs)
@@ -55,16 +55,14 @@ contract TToken is TERC, ITToken {
     mapping(address => Operation[]) private _operationsIn;
     mapping(address => Operation[]) private _operationsOut;
 
-    struct Company {
-        string name;
-        address mainAddress;
-    }
-    // Company code => Company info
-    mapping(uint256 => Company) private _company;
+    // Company address => Company code (in THIS smart contract)
+    mapping(address => uint256) private _company;
+    address[] private _companyAddressById;
+    // mapping(uint256 => address) private _company;
     uint256 private _totalCompanies;
 
-    modifier onlyCompany(uint256 companyId) {
-        require(_company[companyId].mainAddress == _msgSender());
+    modifier onlyExistingCompany() {
+        require(_company[_msgSender()] != 0);
         _;
     }
 
@@ -110,29 +108,61 @@ contract TToken is TERC, ITToken {
             _nomenclatureResources[resourceId] = balances[i];
         }
         _totalProductsInNomenclature = productsLen;
+        _companyAddressById.push(address(this));
     }
 
     // No zero company, zero company for administrative use
-    function addCompany(string calldata name) external {
+    function addCompany() external {
         ++_totalCompanies;
-        _company[_totalCompanies] = Company(name, _msgSender());
+        _company[_msgSender()] = _totalCompanies;
+        _companyAddressById.push(_msgSender()); 
     }
 
     // simulation
     // due to the fact that, as for mvp, we can't work with real assets
     function topUpBalance(
-        uint256 companyId,
         uint256 nationalCurrency, // to pay
         uint256 resourceId // to find out rate for exchange
-    ) external onlyCompany(companyId) {
+    ) external onlyExistingCompany() {
         uint256 rate = getProductPrice(resourceId);
         uint256 toMint = (rate * nationalCurrency) / _ioracle.decimals();
 
         _mint(_msgSender(), toMint);
         _operationsIn[_msgSender()].push(
             Operation(
-                0,
-                companyId,
+                address(this),
+                _msgSender(),
+                OperationCode.TopUp,
+                OperationStatus.Completed,
+                resourceId,
+                nationalCurrency,
+                toMint,
+                block.timestamp
+            )
+        );
+    }
+
+    function topUpBalanceWithAnotherToken(
+        address otherTtoken,
+        uint256 nationalCurrency, // to pay
+        uint256 resourceId // to find out rate for exchange
+    ) external onlyExistingCompany() {
+        uint256 rate = getProductPrice(resourceId);
+        uint256 toMint = (rate * nationalCurrency) / _ioracle.decimals();
+
+        ITToken otherTToken = ITToken(otherTtoken);
+        uint256 thisContractBalanceInOtherToken = 
+            otherTToken.balanceOf(address(this));
+        if(thisContractBalanceInOtherToken < toMint) {
+            otherTToken.transferFrom(address(this), _msgSender(), thisContractBalanceInOtherToken);
+            _mint(_msgSender(), thisContractBalanceInOtherToken);
+        } else {
+            _mint(_msgSender(), toMint);
+        }
+        _operationsIn[_msgSender()].push(
+            Operation(
+                address(this),
+                _msgSender(),
                 OperationCode.TopUp,
                 OperationStatus.Completed,
                 resourceId,
@@ -145,10 +175,9 @@ contract TToken is TERC, ITToken {
 
     // This TToken sell
     function selfWithdraw(
-        uint256 companyId,
         uint256 ttokens,
         uint256 resourceId
-    ) external onlyCompany(companyId) {
+    ) external onlyExistingCompany() {
         uint256 rate = getProductPrice(resourceId);
         uint256 topUpInCurrency = (_ioracle.decimals() * ttokens) / rate;
 
@@ -156,8 +185,8 @@ contract TToken is TERC, ITToken {
         _burn(address(this), ttokens);
         _operationsOut[_msgSender()].push(
             Operation(
-                companyId,
-                0, // smart contract TToken (acts like Central Bank entity)
+                _msgSender(),
+                address(this), // smart contract TToken (acts like Central Bank entity)
                 OperationCode.Withdraw,
                 OperationStatus.Completed,
                 resourceId,
@@ -181,7 +210,7 @@ contract TToken is TERC, ITToken {
         uint256 resourceId
     )
         external
-        onlyCompany(companyId)
+        onlyExistingCompany(companyId)
     {
         IERC20 otherTToken = IERC20(otherToken);
         otherTToken.transferFrom(_msgSender(), address(this), ttokens);
@@ -212,41 +241,24 @@ contract TToken is TERC, ITToken {
         );
     }
 */
-    function getProductPrice(uint256 productId) public view returns (uint256) {
-        return _ioracle.getProductPriceById(productId);
-    }
 
-    function getCountryCode() public view returns (uint256) {
-        return _countryCode;
-    }
-
-    function getFactoryAddress() public view returns (address) {
-        return _factory;
-    }
-
-    function getOracleAddress() public view returns (address) {
-        return address(_ioracle);
-    }
-
-    // if msg.sender == company main address
-    function transfer(
-        uint256 fromCompanyId,
-        uint256 toCompanyId,
-        uint256 ttokens
-    ) 
+    // if msg.sender == company in THIS smart contract
+    function transfer(address toCompanyAddress, uint256 ttokens) 
         external 
-        onlyCompany(fromCompanyId) 
         returns (bool) 
     {
-        address toCompanyAddress = _company[toCompanyId].mainAddress;
         require(
             toCompanyAddress != address(0),
             "TToken: Unappropriate company id for ttokens transfer"
         );
 
+        /* как и в 'transferFrom', тут должна быть проверка того, 
+         *   что 'toCompanyAddress' и вправду существует:
+         *   проверка через обращение к factory, зная countryCode,
+         *   если компания принадлежит не к данному ЦБ
+         */
+
         _recordSimpleTransfer(
-            fromCompanyId,
-            toCompanyId,
             _msgSender(),
             toCompanyAddress,
             ttokens
@@ -254,26 +266,22 @@ contract TToken is TERC, ITToken {
         return super.transferERC20(toCompanyAddress, ttokens);
     }
 
-    // for cases connected with approvals
+    // For cases connected with approvals
     function transferFrom(
-        uint256 fromCompanyId,
-        uint256 toCompanyId,
+        address fromCompanyAddress,
+        address toCompanyAddress,
         uint256 ttokens
     ) external returns (bool) {
-        address fromCompanyAddress = _company[fromCompanyId].mainAddress;
         require(
             fromCompanyAddress != address(0),
-            "TToken: Unappropriate from company id for ttokens transfer"
+            "TToken: fromCompanyAddress is zero"
         );
-        address toCompanyAddress = _company[toCompanyId].mainAddress;
         require(
             toCompanyAddress != address(0),
-            "TToken: Unappropriate to company id for ttokens transfer"
+            "TToken: toCompanyAddress is zero"
         );
 
         _recordSimpleTransfer(
-            fromCompanyId,
-            toCompanyId,
             fromCompanyAddress,
             toCompanyAddress,
             ttokens
@@ -282,15 +290,13 @@ contract TToken is TERC, ITToken {
     }
 
     function _recordSimpleTransfer(
-        uint256 fromCompanyId,
-        uint256 toCompanyId,
         address fromCompanyAddress,
         address toCompanyAddress,
         uint256 ttokens
     ) private {
         Operation memory operationToRecord = Operation(
-            fromCompanyId,
-            toCompanyId,
+            fromCompanyAddress,
+            toCompanyAddress,
             OperationCode.Transfer,
             OperationStatus.Completed,
             0,
@@ -321,4 +327,29 @@ contract TToken is TERC, ITToken {
         address spender,
         uint256 amount
     ) public override(ITToken, TERC) returns (bool) {}
+
+    function getProductPrice(uint256 productId) public view returns (uint256) {
+        return _ioracle.getProductPriceById(productId);
+    }
+
+    function getCountryCode() public view returns (uint256) {
+        return _countryCode;
+    }
+
+    function getFactoryAddress() public view returns (address) {
+        return _factory;
+    }
+
+    function getOracleAddress() public view returns (address) {
+        return address(_ioracle);
+    }
+
+    function getCompanyAddressById(uint256 id) public view returns(address) {
+        return _companyAddressById[id];
+    }
+
+    function getAllCompanies() external view returns(address[] memory) {
+        return _companyAddressById;
+    }
+
 }

@@ -23,8 +23,7 @@ interface ITToken {
      * Emits a {Transfer} event.
      */
     function transfer(
-        uint256 fromCompanyId, 
-        uint256 toCompanyId, 
+        address toCompanyAddress, 
         uint256 ttokens
     ) 
         external returns (bool);
@@ -64,8 +63,8 @@ interface ITToken {
      * Emits a {Transfer} event.
      */
     function transferFrom(
-        uint256 fromCompanyId, 
-        uint256 toCompanyId, 
+        address fromCompanyAddress,
+        address toCompanyAddress,
         uint256 ttokens
     ) 
         external returns (bool);
