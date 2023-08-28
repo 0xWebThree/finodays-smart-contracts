@@ -140,25 +140,28 @@ contract TToken is TERC, ITToken {
                 block.timestamp
             )
         );
+        emit TopUpBalance(_msgSender(), nationalCurrency, toMint);
     }
 
     function topUpBalanceWithAnotherToken(
-        address otherTtoken,
+        address anotherToken,
         uint256 nationalCurrency, // to pay
         uint256 resourceId // to find out rate for exchange
     ) external onlyExistingCompany() {
         uint256 rate = getProductPrice(resourceId);
         uint256 toMint = (rate * nationalCurrency) / _ioracle.decimals();
 
-        ITToken otherTToken = ITToken(otherTtoken);
+        ITToken otherTToken = ITToken(anotherToken);
         uint256 thisContractBalanceInOtherToken = 
             otherTToken.balanceOf(address(this));
         if(thisContractBalanceInOtherToken < toMint) {
-            otherTToken.transferFrom(address(this), _msgSender(), thisContractBalanceInOtherToken);
-            _mint(_msgSender(), thisContractBalanceInOtherToken);
-        } else {
-            _mint(_msgSender(), toMint);
+            toMint = thisContractBalanceInOtherToken;
+            nationalCurrency = (toMint * _ioracle.decimals()) / rate;
         }
+
+        otherTToken.transferFrom(address(this), _msgSender(), toMint);
+        _mint(_msgSender(), toMint);
+
         _operationsIn[_msgSender()].push(
             Operation(
                 address(this),
@@ -171,10 +174,16 @@ contract TToken is TERC, ITToken {
                 block.timestamp
             )
         );
+        emit TopUpBalanceWithAnotherToken(
+            _msgSender(), 
+            anotherToken, 
+            nationalCurrency, 
+            toMint
+        );
     }
 
     // This TToken sell
-    function selfWithdraw(
+    function withdraw(
         uint256 ttokens,
         uint256 resourceId
     ) external onlyExistingCompany() {
@@ -195,6 +204,7 @@ contract TToken is TERC, ITToken {
                 block.timestamp
             )
         );
+        emit Withdraw(_msgSender(), topUpInCurrency, ttokens);
     }
 
     /* Other TToken sell (of another country)
@@ -203,44 +213,39 @@ contract TToken is TERC, ITToken {
      *   must be called first.
      * This TToken contract acts like Central Bank
      */
-    /*  function otherWithdraw(
-        address otherToken,
-        uint256 companyId,
+    function withdrawWithAnotherToken(
+        address anotherToken,
         uint256 ttokens, 
         uint256 resourceId
     )
         external
-        onlyExistingCompany(companyId)
-    {
-        IERC20 otherTToken = IERC20(otherToken);
-        otherTToken.transferFrom(_msgSender(), address(this), ttokens);
-
-    }
-
-    function _withdraw(
-        uint256 companyId,
-        uint256 ttokens, 
-        uint256 resourceId
-    )
-        private
+        onlyExistingCompany()
     {
         uint256 rate = getProductPrice(resourceId);
         uint256 topUpInCurrency = (_ioracle.decimals() * ttokens) / rate;
-         
-        _operationsOut[_msgSender()].push( 
+
+        ITToken anotherTToken = ITToken(anotherToken);
+        anotherTToken.transferFrom(_msgSender(), address(this), ttokens);
+
+        _operationsOut[_msgSender()].push(
             Operation(
-                companyId, 
-                0,         // smart contract TToken (acts like Central Bank entity)
-                OperationCode.Withdraw, 
-                OperationStatus.Completed, 
-                resourceId, 
-                topUpInCurrency, 
-                ttokens, 
+                _msgSender(),
+                address(this), // smart contract TToken (acts like Central Bank entity)
+                OperationCode.Withdraw,
+                OperationStatus.Completed,
+                resourceId,
+                topUpInCurrency,
+                ttokens,
                 block.timestamp
             )
         );
+        emit WithdrawWithAnotherToken(
+            _msgSender(), 
+            anotherToken,
+            topUpInCurrency,
+            ttokens
+        );
     }
-*/
 
     // if msg.sender == company in THIS smart contract
     function transfer(address toCompanyAddress, uint256 ttokens) 

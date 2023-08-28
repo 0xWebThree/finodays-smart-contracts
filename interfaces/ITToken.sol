@@ -5,6 +5,30 @@ pragma solidity ^0.8.0;
  * @dev Interface of the ERC20 standard as defined in the EIP.
  */
 interface ITToken {
+    event TopUpBalance(
+        address indexed receiver, 
+        uint256 inCurrency, 
+        uint256 ttokens
+    );
+    event TopUpBalanceWithAnotherToken(
+        address indexed receiver, 
+        address indexed ttoken, 
+        uint256 inCurrency, 
+        uint256 ttokens
+    );
+
+    event Withdraw(
+        address indexed sender, 
+        uint256 inCurrency, 
+        uint256 ttokens
+    );
+    event WithdrawWithAnotherToken(
+        address indexed sender, 
+        address indexed ttoken,
+        uint256 inCurrency,  
+        uint256 ttokens
+    );
+
     /**
      * @dev Returns the amount of tokens in existence.
      */
