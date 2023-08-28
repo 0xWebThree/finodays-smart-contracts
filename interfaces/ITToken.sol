@@ -48,6 +48,8 @@ interface ITToken {
      */
     function transfer(
         address toCompanyAddress, 
+        uint256 productId,
+        uint256 productAmount,
         uint256 ttokens
     ) 
         external returns (bool);
@@ -89,6 +91,8 @@ interface ITToken {
     function transferFrom(
         address fromCompanyAddress,
         address toCompanyAddress,
+        uint256 productId,
+        uint256 productAmount,
         uint256 ttokens
     ) 
         external returns (bool);

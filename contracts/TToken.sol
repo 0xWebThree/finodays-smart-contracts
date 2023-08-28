@@ -14,7 +14,7 @@ contract TToken is TERC, ITToken {
     // ISO code: http://www.davros.org/misc/iso3166.html
     uint256 private immutable _countryCode;
 
-    // код биржевого товара => balance
+    // код биржевого товара => balance (в TToken)
     mapping(uint256 => uint256) private _nomenclatureResources;
     uint256 private _totalProductsInNomenclature;
 
@@ -159,7 +159,7 @@ contract TToken is TERC, ITToken {
             nationalCurrency = (toMint * _ioracle.decimals()) / rate;
         }
 
-        otherTToken.transferFrom(address(this), _msgSender(), toMint);
+        otherTToken.transferFrom(address(this), _msgSender(), 0, toMint, toMint);
         _mint(_msgSender(), toMint);
 
         _operationsIn[_msgSender()].push(
@@ -186,7 +186,10 @@ contract TToken is TERC, ITToken {
     function withdraw(
         uint256 ttokens,
         uint256 resourceId
-    ) external onlyExistingCompany() {
+    ) 
+        external 
+        onlyExistingCompany() 
+    {
         uint256 rate = getProductPrice(resourceId);
         uint256 topUpInCurrency = (_ioracle.decimals() * ttokens) / rate;
 
@@ -225,7 +228,7 @@ contract TToken is TERC, ITToken {
         uint256 topUpInCurrency = (_ioracle.decimals() * ttokens) / rate;
 
         ITToken anotherTToken = ITToken(anotherToken);
-        anotherTToken.transferFrom(_msgSender(), address(this), ttokens);
+        anotherTToken.transferFrom(_msgSender(), address(this), 0, ttokens, ttokens);
 
         _operationsOut[_msgSender()].push(
             Operation(
@@ -247,8 +250,12 @@ contract TToken is TERC, ITToken {
         );
     }
 
-    // if msg.sender == company in THIS smart contract
-    function transfer(address toCompanyAddress, uint256 ttokens) 
+    function transfer(
+        address toCompanyAddress, 
+        uint256 ttokens, 
+        uint256 productId,
+        uint256 productAmount
+    ) 
         external 
         returns (bool) 
     {
@@ -263,9 +270,11 @@ contract TToken is TERC, ITToken {
          *   если компания принадлежит не к данному ЦБ
          */
 
-        _recordSimpleTransfer(
+        _recordProductTransfer(
             _msgSender(),
             toCompanyAddress,
+            productId,
+            productAmount,
             ttokens
         );
         return super.transferERC20(toCompanyAddress, ttokens);
@@ -275,6 +284,8 @@ contract TToken is TERC, ITToken {
     function transferFrom(
         address fromCompanyAddress,
         address toCompanyAddress,
+        uint256 productId,
+        uint256 productAmount,
         uint256 ttokens
     ) external returns (bool) {
         require(
@@ -286,17 +297,64 @@ contract TToken is TERC, ITToken {
             "TToken: toCompanyAddress is zero"
         );
 
-        _recordSimpleTransfer(
+        _recordProductTransfer(
             fromCompanyAddress,
             toCompanyAddress,
+            productId,
+            productAmount,
             ttokens
         );
         return super.transferFromERC20(fromCompanyAddress, toCompanyAddress, ttokens);
     }
 
-    function _recordSimpleTransfer(
+    // Умное частичное(если не хватает токенов на балансе у цб) погашение товарами
+    function redemption(
+        address companyAddress, 
+        uint256 resourceId, 
+        uint256 ttokens
+    ) 
+        external 
+        returns (bool) 
+    {
+        require(
+            companyAddress != address(0),
+            "TToken: companyAddress is zero"
+        );
+        require(_nomenclatureResources[resourceId] != 0,
+          "TToken: unappropriate resourceId"
+        );
+        require(ttokens != 0,
+          "TToken: unappropriate ttokens amount equal to zero"
+        );
+        if(ttokens > _nomenclatureResources[resourceId]) {
+            ttokens = _nomenclatureResources[resourceId];
+        }
+        _nomenclatureResources[resourceId] -= ttokens;
+        uint256 rate = getProductPrice(resourceId);
+        uint256 inCurrency = (_ioracle.decimals() * ttokens) / rate;
+
+         Operation memory operationToRecord = Operation(
+            _msgSender(),
+            companyAddress,
+            OperationCode.Redemption,
+            OperationStatus.Completed,
+            resourceId,
+            inCurrency,
+            ttokens,
+            block.timestamp
+        );
+        _operationsIn[companyAddress].push(operationToRecord);
+        _operationsOut[_msgSender()].push(operationToRecord);
+
+        return super.transferERC20(companyAddress, ttokens);
+    }
+
+
+    function _recordProductTransfer(
         address fromCompanyAddress,
         address toCompanyAddress,
+        uint256 productId,
+        uint256 productAmount,
         uint256 ttokens
     ) private {
         Operation memory operationToRecord = Operation(
@@ -304,8 +362,8 @@ contract TToken is TERC, ITToken {
             toCompanyAddress,
             OperationCode.Transfer,
             OperationStatus.Completed,
-            0,
-            ttokens,
+            productId,
+            productAmount,
             ttokens,
             block.timestamp
         );
@@ -357,4 +415,21 @@ contract TToken is TERC, ITToken {
         return _companyAddressById;
     }
 
+    function getOperationsInArrayByAddress(
+        address person
+    ) 
+        external view 
+        returns(Operation[] memory) 
+    {
+        return _operationsIn[person];
+    }
+
+    function getOperationsOutArrayByAddress(
+        address person
+    ) 
+        external view 
+        returns(Operation[] memory) 
+    {
+        return _operationsOut[person];
+    }
 }
