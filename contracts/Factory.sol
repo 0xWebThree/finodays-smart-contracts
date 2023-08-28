@@ -24,22 +24,22 @@ contract Factory {
         uint256 countryCode,
         address system,
         uint256[] calldata resourceIds,
-        uint256[] calldata prices,
-        uint256[] calldata balances
+        uint256[] calldata resourceRates,
+        uint256[] calldata resourceBalances
     ) external {
         require(
             _tradePair[countryCode].token == address(0),
             "Factory: TToken contract is already created with specified country code"
         );
 
-        address oracle = _createOracleContract(system, resourceIds, prices);
+        address oracle = _createOracleContract(system, resourceIds, resourceRates);
         address token = _createTokenContract(
             name, 
             symbol, 
             countryCode, 
             oracle, 
             resourceIds,
-            balances
+            resourceBalances
         );
         _tradePair[countryCode] = TradePair(token, oracle);
 
@@ -52,7 +52,7 @@ contract Factory {
         uint256 countryCode,
         address oracle,
         uint256[] calldata resourceIds,
-        uint256[] calldata balances
+        uint256[] calldata resourceBalances
     ) 
         internal returns(address) 
     {
@@ -63,7 +63,7 @@ contract Factory {
             oracle,
             address(this),
             resourceIds,
-            balances
+            resourceBalances
         );
         return address(newTTokenContract);
     }
@@ -71,13 +71,13 @@ contract Factory {
     function _createOracleContract(
         address system, 
         uint256[] calldata resourceIds, 
-        uint256[] calldata prices
+        uint256[] calldata resourceRates
     ) 
        internal 
        returns(address) 
     {
         Oracle newOracleContract = new Oracle(
-            system, resourceIds, prices
+            system, resourceIds, resourceRates
         );
         return address(newOracleContract);
     }

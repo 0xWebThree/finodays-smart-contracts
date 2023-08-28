@@ -21,6 +21,11 @@ module.exports = {
     },
   },
   networks: {
+    sepolia: {
+      url: 'https://sepolia.infura.io/v3/92a117f286914f259e30d3338aad054d',
+      accounts: [`0x${PRIVATE_KEY}`], 
+      chainId: 11155111
+    },
   }, 
   docgen: {
     path: './docs',

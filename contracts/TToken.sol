@@ -72,7 +72,7 @@ contract TToken is TERC, ITToken {
         address productOracle,
         address factory,
         uint256[] memory resourceIds,
-        uint256[] memory balances
+        uint256[] memory resourceBalances
     ) TERC(name, symbol) {
         require(countryCode != 0, "TToken: There is no country with zero code");
         require(
@@ -84,7 +84,7 @@ contract TToken is TERC, ITToken {
             "TToken: Factory address must be initialized"
         );
 
-        uint256 productsLen = balances.length;
+        uint256 productsLen = resourceBalances.length;
         require(
             productsLen != 0,
             "TToken: zero length of balance array for nomenclature of products"
@@ -101,10 +101,10 @@ contract TToken is TERC, ITToken {
         for (i; i < productsLen; i++) {
             uint256 resourceId = resourceIds[i];
             require(
-                balances[i] != 0,
+                resourceBalances[i] != 0,
                 "TToken: balance for product in nomenclature mustn'be zero"
             );
-            _nomenclatureResources[resourceId] = balances[i];
+            _nomenclatureResources[resourceId] = resourceBalances[i];
         }
         _companyAddressById.push(address(this));
     }
@@ -159,7 +159,7 @@ contract TToken is TERC, ITToken {
             nationalCurrency = (toMint * _ioracle.decimals()) / rate;
         }
 
-        otherTToken.transferFrom(address(this), _msgSender(), 0, toMint, toMint);
+        otherTToken.transfer(_msgSender(), 0, toMint, toMint);
         _mint(_msgSender(), toMint);
 
         _operationsIn[_msgSender()].push(
@@ -311,7 +311,7 @@ contract TToken is TERC, ITToken {
     function redemption(
         address companyAddress, 
         uint256 resourceId, 
-        uint256 ttokens
+        uint256 ttokens  
     ) 
         external 
         returns (bool) 

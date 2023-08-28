@@ -1,5 +1,11 @@
 # Solidity smart contracts & Hardhat
 
+## Generate docs
+### With compilation
+```bash
+npx hardhat docgen
+```
+
 ## Software requirements
 Checked on:
   Node: 16.16.0
@@ -25,12 +31,6 @@ npx hardhat run scripts/deploy.js --network <network_name>
 ## Run tests
 ```bash
 npx hardhat test
-```
-
-## Generate docs
-### With compilation
-```bash
-npx hardhat docgen
 ```
 
 ### Without compilation

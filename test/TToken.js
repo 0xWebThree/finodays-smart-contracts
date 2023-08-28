@@ -147,6 +147,10 @@ describe("TToken", function () {
           
           // balance = 3200, 
           await token1.connect(russia1).withdraw(1000, resourceIds1[0])
+
+          // tokens to withdraw sends back to central bank
+          expect(await token1.balanceOf(token1.address)).to.equal(1000)
+
           expect(await token1.getCompanyId(russia1.address)).to.equal(1)
           expect(await token1.balanceOf(russia1.address)).to.equal(3200-1000)
 
@@ -172,6 +176,35 @@ describe("TToken", function () {
           )
           expect(await token1.balanceOf(russia1.address)).to.equal(200-100-100)
           expect(await token1.balanceOf(russia2.address)).to.equal(1000+100+100)
+
+        });
+
+        it("TopUpBalance & Withdraw through another token", async function () {
+          const { 
+            factory, token1, 
+            token2, token3, 
+            addrRussia, addrChina, 
+            addrIndia, system 
+          } = await loadFixture(deployFactoryFixture);
+          const russia1 = await ethers.getSigner(10)
+          const china1 = await ethers.getSigner(11)
+
+          await token1.connect(russia1).addCompany()
+          await token2.connect(china1).addCompany()
+
+          await token1.connect(russia1).topUpBalance(500, resourceIds1[0])
+          await token2.connect(china1).topUpBalance(700, resourceIds1[0])
+
+          // сделать резерв с другим токеном у банка рф, симуляция 
+          await token2.connect(china1).transfer(token1.address, 700, 0, 0);
+          expect(await token2.balanceOf(token1.address)).to.equal(700)
+          
+          // пополнение через другой токен (у цб есть) на 100 рублей по курсу рф
+          await token1.connect(russia1)
+            .topUpBalanceWithAnotherToken(token2.address, 100, resourceIds1[0])
+
+          // 20*100 > 700 => переведется на 700. частичный минт, тк недостаточно средств
+          expect(await token2.balanceOf(russia1.address)).to.equal(700)
 
         });
     });
