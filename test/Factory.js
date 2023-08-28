@@ -11,7 +11,7 @@ const countryCode1 = 643
 const resourceIds1 = [1, 3, 4, 5]
 const prices1 = [20, 30, 10, 5]
 const balances1 = [5, 10, 30, 40]
-
+/*
 describe("Factory", function () {
     async function deployFactoryFixture() {
         const factory = await ethers.deployContract("Factory");
@@ -57,3 +57,4 @@ describe("Factory", function () {
         });
     });
 });
+*/

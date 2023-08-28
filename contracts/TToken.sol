@@ -16,7 +16,6 @@ contract TToken is TERC, ITToken {
 
     // код биржевого товара => balance (в TToken)
     mapping(uint256 => uint256) private _nomenclatureResources;
-    uint256 private _totalProductsInNomenclature;
 
     ITToken internal ittoken;
     IOracle internal immutable _ioracle;
@@ -88,11 +87,11 @@ contract TToken is TERC, ITToken {
         uint256 productsLen = balances.length;
         require(
             productsLen != 0,
-            "TToken: zero length of price array for nomenclature of products"
+            "TToken: zero length of balance array for nomenclature of products"
         );
         require(
             productsLen == resourceIds.length,
-            "TToken: length of resourceIds and price arrays must be equal"
+            "TToken: length of resourceIds and balance arrays must be equal"
         );
 
         _countryCode = countryCode;
@@ -107,12 +106,13 @@ contract TToken is TERC, ITToken {
             );
             _nomenclatureResources[resourceId] = balances[i];
         }
-        _totalProductsInNomenclature = productsLen;
         _companyAddressById.push(address(this));
     }
 
-    // No zero company, zero company for administrative use
+    // zero company - this smart contract
     function addCompany() external {
+        require(_company[_msgSender()] == 0, "TToken: company already exists");
+        
         ++_totalCompanies;
         _company[_msgSender()] = _totalCompanies;
         _companyAddressById.push(_msgSender()); 
@@ -124,7 +124,7 @@ contract TToken is TERC, ITToken {
         uint256 nationalCurrency, // to pay
         uint256 resourceId // to find out rate for exchange
     ) external onlyExistingCompany() {
-        uint256 rate = getProductPrice(resourceId);
+        uint256 rate = getProductRate(resourceId);
         uint256 toMint = (rate * nationalCurrency) / _ioracle.decimals();
 
         _mint(_msgSender(), toMint);
@@ -148,7 +148,7 @@ contract TToken is TERC, ITToken {
         uint256 nationalCurrency, // to pay
         uint256 resourceId // to find out rate for exchange
     ) external onlyExistingCompany() {
-        uint256 rate = getProductPrice(resourceId);
+        uint256 rate = getProductRate(resourceId);
         uint256 toMint = (rate * nationalCurrency) / _ioracle.decimals();
 
         ITToken otherTToken = ITToken(anotherToken);
@@ -190,11 +190,11 @@ contract TToken is TERC, ITToken {
         external 
         onlyExistingCompany() 
     {
-        uint256 rate = getProductPrice(resourceId);
+        uint256 rate = getProductRate(resourceId);
         uint256 topUpInCurrency = (_ioracle.decimals() * ttokens) / rate;
 
         // sell TTokens to Central Bank for real national currency
-        _burn(address(this), ttokens);
+        _transfer(_msgSender(), address(this), ttokens);
         _operationsOut[_msgSender()].push(
             Operation(
                 _msgSender(),
@@ -224,7 +224,7 @@ contract TToken is TERC, ITToken {
         external
         onlyExistingCompany()
     {
-        uint256 rate = getProductPrice(resourceId);
+        uint256 rate = getProductRate(resourceId);
         uint256 topUpInCurrency = (_ioracle.decimals() * ttokens) / rate;
 
         ITToken anotherTToken = ITToken(anotherToken);
@@ -330,7 +330,7 @@ contract TToken is TERC, ITToken {
             ttokens = _nomenclatureResources[resourceId];
         }
         _nomenclatureResources[resourceId] -= ttokens;
-        uint256 rate = getProductPrice(resourceId);
+        uint256 rate = getProductRate(resourceId);
         uint256 inCurrency = (_ioracle.decimals() * ttokens) / rate;
 
          Operation memory operationToRecord = Operation(
@@ -357,6 +357,8 @@ contract TToken is TERC, ITToken {
         uint256 productAmount,
         uint256 ttokens
     ) private {
+        if(productId == 0) 
+            productAmount = ttokens; // 0 - обозначение просто перевода торгового токена
         Operation memory operationToRecord = Operation(
             fromCompanyAddress,
             toCompanyAddress,
@@ -371,28 +373,17 @@ contract TToken is TERC, ITToken {
         _operationsOut[fromCompanyAddress].push(operationToRecord);
     }
 
-    function totalSupply()
+    function balanceOf(address account)
         public
         view
         override(ITToken, TERC)
-        returns (uint256) {}
+        returns (uint256) {
+            return super.balanceOf(account);
+    }
 
-    function balanceOf(
-        address account
-    ) public view override(ITToken, TERC) returns (uint256) {}
 
-    function allowance(
-        address owner,
-        address spender
-    ) public view override(ITToken, TERC) returns (uint256) {}
-
-    function approve(
-        address spender,
-        uint256 amount
-    ) public override(ITToken, TERC) returns (bool) {}
-
-    function getProductPrice(uint256 productId) public view returns (uint256) {
-        return _ioracle.getProductPriceById(productId);
+    function getProductRate(uint256 productId) public view returns (uint256) {
+        return _ioracle.getProductRateById(productId);
     }
 
     function getCountryCode() public view returns (uint256) {
@@ -431,5 +422,13 @@ contract TToken is TERC, ITToken {
         returns(Operation[] memory) 
     {
         return _operationsOut[person];
+    }
+
+    function getNomenclatureResourceBalance(uint256 resourceId) external view returns(uint256) {
+        return _nomenclatureResources[resourceId];
+    }
+
+    function getCompanyId(address account) external view returns(uint256) {
+        return _company[account];
     }
 }

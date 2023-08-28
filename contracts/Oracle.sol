@@ -9,46 +9,46 @@ import "../interfaces/IOracle.sol";
  * К нему обращается токен торговой пары для получения рейта
  */
 contract Oracle is IOracle, Ownable {
-    mapping(uint256 => uint256) private _productPrice;
+    mapping(uint256 => uint256) private _productRate;
 
-    event PriceChange(uint256 indexed productId, uint256 oldPrice, uint256 newPrice);
+    event RateChange(uint256 indexed productId, uint256 oldRate, uint256 newRate);
 
     constructor(
         address system, 
         uint256[] memory resourceIds,  
-        uint256[] memory prices
+        uint256[] memory rates
     ) Ownable() {
         if(system != owner()) {
             transferOwnership(system);
         }
 
         uint256 productsLen = resourceIds.length;
-        require(productsLen != 0, "TToken: zero length of price array for nomenclature of products");
-        require(productsLen == prices.length, "TToken: length of resourceIds and price arrays must be equal");
+        require(productsLen != 0, "TToken: zero length of Rate array for nomenclature of products");
+        require(productsLen == rates.length, "TToken: length of resourceIds and Rate arrays must be equal");
 
         uint256 i;
         for(i; i<productsLen; i++) {
             uint256 resourceId = resourceIds[i];
             require(
-                prices[i] != 0, 
-                "Oracle: price for product in nomenclature mustn'be zero"
+                rates[i] != 0, 
+                "Oracle: Rate for product in nomenclature mustn'be zero"
             );
-            _productPrice[resourceId] = prices[i];
+            _productRate[resourceId] = rates[i];
         }
     }
 
-    function setProductPrice(
+    function setProductRate(
         uint256 productId, 
-        uint256 newProductPrice
+        uint256 newProductRate
     ) 
         public 
         onlyOwner 
     {
-        uint256 price = _productPrice[productId];
-        require(price != 0, "Oracle: unappropriate productId");
+        uint256 rate = _productRate[productId];
+        require(rate != 0, "Oracle: unappropriate productId");
         
-        _productPrice[productId] = newProductPrice;
-        emit PriceChange(productId, price, newProductPrice);
+        _productRate[productId] = newProductRate;
+        emit RateChange(productId, rate, newProductRate);
     }
 
     // Fixed number for mvp
@@ -56,10 +56,10 @@ contract Oracle is IOracle, Ownable {
         return 1;
     }
 
-    function getProductPriceById(uint256 productId) external view returns(uint256) {
-       uint256 price = _productPrice[productId];
-       require(price != 0, "Oracle: unappropriate productId");
+    function getProductRateById(uint256 productId) external view returns(uint256) {
+       uint256 rate = _productRate[productId];
+       require(rate != 0, "Oracle: unappropriate productId");
        
-       return price;
+       return rate;
     }
 }
