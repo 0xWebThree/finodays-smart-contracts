@@ -47,7 +47,8 @@ contract Oracle is IOracle, Ownable {
         onlyOwner 
     {
         uint256 rate = _productRate[productId];
-        require(rate != 0, "Oracle: unappropriate productId");
+        require(productId != 0, "Oracle: unappropriate productId");
+        require(rate != 0, "Oracle: unappropriate newProductRate");
         
         _productRate[productId] = newProductRate;
         emit RateChange(productId, rate, newProductRate);

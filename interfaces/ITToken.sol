@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 /**
- * @dev Interface of the ERC20 standard as defined in the EIP.
+ * @dev Интерфейс для TToken.
  */
 interface ITToken {
     event TopUpBalance(

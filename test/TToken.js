@@ -115,6 +115,7 @@ describe("TToken", function () {
           } = await loadFixture(deployFactoryFixture);
           const russia1 = await ethers.getSigner(10)
           const russia2 = await ethers.getSigner(11)
+          const russia3 = await ethers.getSigner(12)
           
           //Company add
           
@@ -142,10 +143,11 @@ describe("TToken", function () {
           console.log(await token1.balanceOf(russia1.address))
           expect(await token1.balanceOf(russia1.address)).to.equal(prices1[1]*40 + prices1[0]*100)
 
-          console.log("Operation2: ", await token1.getOperationsInArrayByAddress(russia1.address))
-          
           // balance = 3200, 
           await token1.connect(russia1).withdraw(1000, resourceIds1[0])
+          await expect(
+            token1.connect(russia3).extendLimitToProductByCompany(resourceIds1[0], 100)
+          ).to.be.revertedWith('TToken: only connected to this Central Bank companies can call function');
 
           // tokens to withdraw sends back to central bank
           expect(await token1.balanceOf(token1.address)).to.equal(1000)

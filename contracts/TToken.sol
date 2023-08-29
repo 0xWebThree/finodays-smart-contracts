@@ -14,8 +14,9 @@ contract TToken is TERC, ITToken {
     // ISO code: http://www.davros.org/misc/iso3166.html
     uint256 private immutable _countryCode;
 
-    // код биржевого товара => balance (в TToken)
+    // код биржевого товара => balance/limit (в TToken)
     mapping(uint256 => uint256) private _nomenclatureResources;
+    uint256[] private _nomenclatureResourceIds; // для фронта
 
     ITToken internal ittoken;
     IOracle internal immutable _ioracle;
@@ -37,7 +38,7 @@ contract TToken is TERC, ITToken {
     enum OperationStatus {
         Created,
         InProgress,
-        Completed
+        Completed // заглушка. автоматом ставится. а так предполагаются стейты для изменения состояния транзакции через оракул/доверенную сторону
     }
     struct Operation {
         address from;
@@ -49,7 +50,7 @@ contract TToken is TERC, ITToken {
         uint256 ttokensAmount;
         uint256 timestamp;
     }
-    /* @note After mvp will be deprecated in favor of event listener
+    /* @note After mvp mappings will be deprecated in favor of event listener
      * _operationsIn - top up only in ttoken
      * _operationsOut - withdrawal only in ttoken
      */
@@ -63,7 +64,10 @@ contract TToken is TERC, ITToken {
     uint256 private _totalCompanies;
 
     modifier onlyExistingCompany() {
-        require(_company[_msgSender()] != 0);
+        require(
+            _company[_msgSender()] != 0,
+            "TToken: only connected to this Central Bank companies can call function"
+        );
         _;
     }
 
@@ -107,7 +111,9 @@ contract TToken is TERC, ITToken {
                 "TToken: balance for product in nomenclature mustn'be zero"
             );
             _nomenclatureResources[resourceId] = resourceBalances[i];
+            _nomenclatureResourceIds.push(resourceId);
         }
+        // zero company, этот смарт для служебных целей
         _companyAddressById.push(address(this));
     }
 
@@ -118,6 +124,26 @@ contract TToken is TERC, ITToken {
         ++_totalCompanies;
         _company[_msgSender()] = _totalCompanies;
         _companyAddressById.push(_msgSender()); 
+    }
+
+    // концепция, заглушка.
+    // когда цб покупает на внутреннем рынке товар(биржевой) за рубли
+    function extendLimitToProductByCompany(
+        uint256 nomenclatureResource, 
+        uint256 limitToAdd
+    ) 
+        external
+        onlyExistingCompany() // тк на внутреннем рынке только
+    {
+        require(
+            nomenclatureResource != 0, 
+            "TToken: nomenclature resource doesn't exist"
+        );
+        require(
+            limitToAdd != 0, 
+            "TToken: limit to add is zero"
+        );
+       _nomenclatureResources[nomenclatureResource] += limitToAdd;
     }
 
     // simulation
@@ -234,7 +260,6 @@ contract TToken is TERC, ITToken {
      * number of 'ttokens' must be approved for transferring to this contract.
      * So, before calling this function 'approve' on another TToken contract
      *   must be called first.
-     * This TToken contract acts like Central Bank
      */
     function withdrawWithAnotherToken(
         address anotherToken,
@@ -287,12 +312,11 @@ contract TToken is TERC, ITToken {
             toCompanyAddress != address(0),
             "TToken: Unappropriate company id for ttokens transfer"
         );
-
-        /* как и в 'transferFrom', тут должна быть проверка того, 
-         *   что 'toCompanyAddress' и вправду существует:
-         *   проверка через обращение к factory, зная countryCode,
-         *   если компания принадлежит не к данному ЦБ
-         */
+        if(productId != 0) 
+            require(
+                productAmount != 0,
+                "TToken: product amount must be pozitive"
+            );
 
         _recordProductTransfer(
             _msgSender(),
@@ -357,6 +381,7 @@ contract TToken is TERC, ITToken {
         }
         _nomenclatureResources[resourceId] -= ttokens;
         // если такого resourceId нет => revert tx
+        // productId равный нулю, не принимается. тк обозначает сам токен
         uint256 rate = getProductRate(resourceId);
         uint256 inCurrency = (_ioracle.decimals() * ttokens) / rate;
         // чтобы копейки токенов не переводились
@@ -365,11 +390,11 @@ contract TToken is TERC, ITToken {
             "TToken(02): too low amount of ttokens to redempt"
         );
 
-         Operation memory operationToRecord = Operation(
+        Operation memory operationToRecord = Operation(
             _msgSender(),
             toCompanyAddress,
             OperationCode.Redemption,
-            OperationStatus.Completed,
+            OperationStatus.Completed, // заглушка, автоматом ставится. концептуально преподлагается изменение стейтов
             resourceId,
             inCurrency,
             ttokens,
@@ -462,5 +487,9 @@ contract TToken is TERC, ITToken {
 
     function getCompanyId(address account) external view returns(uint256) {
         return _company[account];
+    }
+
+    function getAllNomenclatureResourceIds() external view returns(uint256[] memory) {
+        return _nomenclatureResourceIds;
     }
 }
