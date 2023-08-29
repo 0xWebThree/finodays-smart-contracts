@@ -261,6 +261,7 @@ contract TToken is TERC, ITToken {
      * So, before calling this function 'approve' on another TToken contract
      *   must be called first.
      */
+    // Может выполнять функцию ручного клиринга
     function withdrawWithAnotherToken(
         address anotherToken,
         uint256 ttokens, 
