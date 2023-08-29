@@ -5,7 +5,7 @@ async function main() {
   // золото нефть газ лес
   const resourceIds1 = [1, 3, 4, 5]
   const prices1 = [20, 30, 10, 5]
-  const balances1 = [5, 10, 30, 40]
+  const balances1 = [5000000, 1000000, 300000, 4000000]
   
   const name2 = "TTChina"
   const symbol2 = "TTC"
@@ -13,7 +13,7 @@ async function main() {
   // золото металлы 
   const resourceIds2 = [1, 2]
   const prices2 = [50, 100]
-  const balances2 = [1000, 2000]
+  const balances2 = [10000000, 2000000]
   
   const name3 = "TTIndia"
   const symbol3 = "TTI"
@@ -21,7 +21,7 @@ async function main() {
   // золото нефть газ
   const resourceIds3 = [1, 3, 4]
   const prices3 = [10, 20, 5]
-  const balances3 = [10, 5, 2]
+  const balances3 = [1000000, 50000000, 200000]
 
   const systemAddress = "0x0792157d69D1ee26c927d8A6E6e88D50D4DC039e"
 
@@ -67,26 +67,7 @@ async function main() {
   const tokenFactory = await ethers.getContractFactory("TToken");
   const contractABI = tokenFactory.interface;
 
-  const token1 = new ethers.Contract(
-    await factory.getTokenAddressByCountryCode(countryCode1), 
-      contractABI, 
-      deployer
-  );
-  const token2 = new ethers.Contract(
-    await factory.getTokenAddressByCountryCode(countryCode2), 
-      contractABI, 
-      deployer
-  );
-  const token3 = new ethers.Contract(
-    await factory.getTokenAddressByCountryCode(countryCode3), 
-      contractABI, 
-      deployer
-  );
-
   console.log("Deployed factory contract address:", factory.address);
-  console.log("Deployed token1 contract address:", token1.address);
-  console.log("Deployed token2 contract address:", token2.address);
-  console.log("Deployed token3 contract address:", token3.address);
 }
 
 main()

@@ -2,9 +2,9 @@ module.exports = [
     "TTRussia",
     "TTR",
     643,
-    "0x6a50a7e7ae42068d8aa60a8e03cb9e446db1d1d5",
-    "0x15ffC2AA76270fa964Aeb7bB889c366ECb126D35",
+    "0xca07763050dc270cff3d31218a45cb454f0a8a50",
+    "0xF5C02Bb54768CE1E20Df1a955964bc4B6FaDa06c",
     [1, 3, 4, 5],
-    [5, 10, 30, 40]
+    [5000000, 1000000, 300000, 4000000]
   ];
 
