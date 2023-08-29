@@ -9,6 +9,8 @@ import "../interfaces/IOracle.sol";
  * К нему обращается токен торговой пары для получения рейта
  */
 contract Oracle is IOracle, Ownable {
+    // больше как лимиты. для того, чтобы другие расплачивались другими курсами
+    // а не только золотом 
     mapping(uint256 => uint256) private _productRate;
 
     event RateChange(uint256 indexed productId, uint256 oldRate, uint256 newRate);
@@ -51,7 +53,8 @@ contract Oracle is IOracle, Ownable {
         emit RateChange(productId, rate, newProductRate);
     }
 
-    // Fixed number for mvp
+    // Fixed number for mvp,
+    // работает вместе с рейтом в паре
     function decimals() external pure returns(uint256) {
         return 1;
     }

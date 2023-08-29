@@ -24,9 +24,11 @@ contract TToken is TERC, ITToken {
     // Redemption - 'умное' погашение перевода товаром, частичное(если не хватает товара)
     enum OperationCode {
         TopUp,
+        TopUpWithAnotherToken,
         Transfer,
         Redemption,
-        Withdraw
+        Withdraw,
+        WithdrawWithAnotherToken
     }
     /*
      * all operation statuses will be 'Completed' in MVP
@@ -126,6 +128,10 @@ contract TToken is TERC, ITToken {
     ) external onlyExistingCompany() {
         uint256 rate = getProductRate(resourceId);
         uint256 toMint = (rate * nationalCurrency) / _ioracle.decimals();
+        require(
+            toMint != 0, 
+            "TToken(02): too low amount of nationalCurrency to top up balance"
+        );
 
         _mint(_msgSender(), toMint);
         _operationsIn[_msgSender()].push(
@@ -154,19 +160,29 @@ contract TToken is TERC, ITToken {
         ITToken otherTToken = ITToken(anotherToken);
         uint256 thisContractBalanceInOtherToken = 
             otherTToken.balanceOf(address(this));
+        require(
+            thisContractBalanceInOtherToken != 0,
+            "TToken(01): not enough funds of another token in Central Bank"
+        );
         if(thisContractBalanceInOtherToken < toMint) {
             toMint = thisContractBalanceInOtherToken;
+            // заплатить меньше должен в реал активах, тк нехватка токенов у цб
             nationalCurrency = (toMint * _ioracle.decimals()) / rate;
         }
+        require(
+            toMint != 0 && nationalCurrency != 0, 
+            "TToken(02): too low amount of nationalCurrency to top up balance"
+        );
 
-        otherTToken.transfer(_msgSender(), 0, toMint, toMint);
-        _mint(_msgSender(), toMint);
+        // в рамках смарта otherToken это просто перевод. 
+        // поэтому id = 0, обозначение чисто перевода токенов
+        otherTToken.transfer(_msgSender(), toMint, 0, toMint); 
 
         _operationsIn[_msgSender()].push(
             Operation(
-                address(this),
+                anotherToken,
                 _msgSender(),
-                OperationCode.TopUp,
+                OperationCode.TopUpWithAnotherToken,
                 OperationStatus.Completed,
                 resourceId,
                 nationalCurrency,
@@ -192,6 +208,10 @@ contract TToken is TERC, ITToken {
     {
         uint256 rate = getProductRate(resourceId);
         uint256 topUpInCurrency = (_ioracle.decimals() * ttokens) / rate;
+        require(
+            topUpInCurrency != 0,
+            "TToken(02): too low amount of ttokens to withdraw"
+        );
 
         // sell TTokens to Central Bank for real national currency
         _transfer(_msgSender(), address(this), ttokens);
@@ -226,6 +246,10 @@ contract TToken is TERC, ITToken {
     {
         uint256 rate = getProductRate(resourceId);
         uint256 topUpInCurrency = (_ioracle.decimals() * ttokens) / rate;
+        require(
+            topUpInCurrency != 0,
+            "TToken: too low amount of ttokens to withdraw"
+        );
 
         ITToken anotherTToken = ITToken(anotherToken);
         anotherTToken.transferFrom(_msgSender(), address(this), 0, ttokens, ttokens);
@@ -233,8 +257,8 @@ contract TToken is TERC, ITToken {
         _operationsOut[_msgSender()].push(
             Operation(
                 _msgSender(),
-                address(this), // smart contract TToken (acts like Central Bank entity)
-                OperationCode.Withdraw,
+                anotherToken, // smart contract TToken (acts like Central Bank entity)
+                OperationCode.WithdrawWithAnotherToken,
                 OperationStatus.Completed,
                 resourceId,
                 topUpInCurrency,
@@ -309,7 +333,7 @@ contract TToken is TERC, ITToken {
 
     // Умное частичное(если не хватает токенов на балансе у цб) погашение товарами
     function redemption(
-        address companyAddress, 
+        address toCompanyAddress, 
         uint256 resourceId, 
         uint256 ttokens  
     ) 
@@ -317,25 +341,33 @@ contract TToken is TERC, ITToken {
         returns (bool) 
     {
         require(
-            companyAddress != address(0),
-            "TToken: companyAddress is zero"
+            toCompanyAddress != address(0),
+            "TToken: toCompanyAddress is zero"
         );
-        require(_nomenclatureResources[resourceId] != 0,
+        uint256 nomenclatureResourceBalance = _nomenclatureResources[resourceId];
+        require(nomenclatureResourceBalance != 0,
           "TToken: unappropriate resourceId"
         );
         require(ttokens != 0,
           "TToken: unappropriate ttokens amount equal to zero"
         );
-        if(ttokens > _nomenclatureResources[resourceId]) {
-            ttokens = _nomenclatureResources[resourceId];
+        // если превышение лимита(баланса), гасится максимум средств
+        if(ttokens > nomenclatureResourceBalance) {
+            ttokens = nomenclatureResourceBalance;
         }
         _nomenclatureResources[resourceId] -= ttokens;
+        // если такого resourceId нет => revert tx
         uint256 rate = getProductRate(resourceId);
         uint256 inCurrency = (_ioracle.decimals() * ttokens) / rate;
+        // чтобы копейки токенов не переводились
+        require(
+            inCurrency != 0, 
+            "TToken(02): too low amount of ttokens to redempt"
+        );
 
          Operation memory operationToRecord = Operation(
             _msgSender(),
-            companyAddress,
+            toCompanyAddress,
             OperationCode.Redemption,
             OperationStatus.Completed,
             resourceId,
@@ -343,10 +375,10 @@ contract TToken is TERC, ITToken {
             ttokens,
             block.timestamp
         );
-        _operationsIn[companyAddress].push(operationToRecord);
+        _operationsIn[toCompanyAddress].push(operationToRecord);
         _operationsOut[_msgSender()].push(operationToRecord);
 
-        return super.transferERC20(companyAddress, ttokens);
+        return super.transferERC20(toCompanyAddress, ttokens);
     }
 
 

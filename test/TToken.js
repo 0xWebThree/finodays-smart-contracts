@@ -10,7 +10,7 @@ const countryCode1 = 643
 // золото нефть газ лес
 const resourceIds1 = [1, 3, 4, 5]
 const prices1 = [20, 30, 10, 5]
-const balances1 = [5, 10, 30, 40]
+const balances1 = [5000000, 1000000, 300000, 4000000]
 
 const name2 = "TTChina"
 const symbol2 = "TTC"
@@ -18,7 +18,7 @@ const countryCode2 = 156
 // золото металлы 
 const resourceIds2 = [1, 2]
 const prices2 = [50, 100]
-const balances2 = [1000, 2000]
+const balances2 = [10000000, 2000000]
 
 const name3 = "TTIndia"
 const symbol3 = "TTI"
@@ -26,7 +26,7 @@ const countryCode3 = 356
 // золото нефть газ
 const resourceIds3 = [1, 3, 4]
 const prices3 = [10, 20, 5]
-const balances3 = [10, 5, 2]
+const balances3 = [1000000, 50000000, 200000]
 
 
 describe("TToken", function () {
@@ -100,10 +100,10 @@ describe("TToken", function () {
           expect(await token1.getFactoryAddress()).to.equal(factory.address)
           expect(await token1.getCompanyAddressById(0)).to.equal(token1.address)
           expect((await token1.getAllCompanies()).length).to.equal(1)
-          expect(await token1.getNomenclatureResourceBalance(1)).to.equal(5)
-          expect(await token1.getNomenclatureResourceBalance(3)).to.equal(10)
-          expect(await token1.getNomenclatureResourceBalance(4)).to.equal(30)
-          expect(await token1.getNomenclatureResourceBalance(5)).to.equal(40)
+          expect(await token1.getNomenclatureResourceBalance(1)).to.equal(balances1[0])
+          expect(await token1.getNomenclatureResourceBalance(3)).to.equal(balances1[1])
+          expect(await token1.getNomenclatureResourceBalance(4)).to.equal(balances1[2])
+          expect(await token1.getNomenclatureResourceBalance(5)).to.equal(balances1[3])
         });
 
         it("Add company, top up balance, withdraw, transfer ttoken", async function () {
@@ -191,6 +191,7 @@ describe("TToken", function () {
           await token1.connect(russia1).addCompany()
           await token2.connect(china1).addCompany()
 
+          /* topUpBalanceWithAnotherToken */
           await token1.connect(russia1).topUpBalance(500, resourceIds1[0])
           await token2.connect(china1).topUpBalance(700, resourceIds1[0])
 
@@ -198,13 +199,74 @@ describe("TToken", function () {
           await token2.connect(china1).transfer(token1.address, 700, 0, 0);
           expect(await token2.balanceOf(token1.address)).to.equal(700)
           
-          // пополнение через другой токен (у цб есть) на 100 рублей по курсу рф
-          await token1.connect(russia1)
+          // пополнение через другой токен в цб рф на 100 рублей по курсу рф
+          const topupR1 = await token1.connect(russia1)
             .topUpBalanceWithAnotherToken(token2.address, 100, resourceIds1[0])
-
+         
+          await expect(topupR1)
+            .to.emit(token1, "TopUpBalanceWithAnotherToken")
+            .withArgs(russia1.address, token2.address, 700/prices1[0], 700); // тк меньше в реал активах понадобится
           // 20*100 > 700 => переведется на 700. частичный минт, тк недостаточно средств
+         
           expect(await token2.balanceOf(russia1.address)).to.equal(700)
+          expect(await token2.balanceOf(token1.address)).to.equal(0)
+          
+          /* withdrawWithAnotherToken */
+          // сначала нужно аппрувнуть токены для перевода,
+          // чтобы token1 (наш цб, у которого ничего нет) 
+          // мог забрать их себе из адреса russia1
+          await token2.connect(russia1).approve(token1.address, 300);
 
+          await token1.connect(russia1).withdrawWithAnotherToken(
+            token2.address, 200, resourceIds1[0]);
+          expect(await token2.balanceOf(token1.address)).to.equal(200)
+          expect(await token2.balanceOf(russia1.address)).to.equal(700-200)
+
+          await token1.connect(russia1).withdrawWithAnotherToken(
+            token2.address, 100, resourceIds1[0]);
+          expect(await token2.balanceOf(token1.address)).to.equal(200+100)
+          expect(await token2.balanceOf(russia1.address)).to.equal(700-200-100)
+
+          // тк цб исчерпал все allowance от russia1 по его инициации
+          await expect(
+            token1.connect(russia1).withdrawWithAnotherToken(
+              token2.address, 1000, resourceIds1[0])
+          ).to.be.revertedWith('ERC20: insufficient allowance');
+        });
+        it("Redemption: частичное умное погашение", async function () {
+          const { 
+            factory, token1, 
+            token2, token3, 
+            addrRussia, addrChina, 
+            addrIndia, system 
+          } = await loadFixture(deployFactoryFixture);
+          const russia1 = await ethers.getSigner(10)
+          const russia2 = await ethers.getSigner(11)
+          const russia3 = await ethers.getSigner(12)
+
+          await token1.connect(russia1).addCompany()
+          await token1.connect(russia2).addCompany()
+          await token1.connect(russia3).addCompany()
+
+          await token1.connect(russia1).topUpBalance(100, resourceIds1[0])
+          await token1.connect(russia2).topUpBalance(200, resourceIds1[0])
+
+          expect(await token1.balanceOf(russia1.address)).to.equal(100*prices1[0])
+          expect(await token1.balanceOf(russia2.address)).to.equal(200*prices1[0])
+
+          // гасим по 30, лимит 1000000
+          await token1.connect(russia1).redemption(russia2.address, resourceIds1[1], 100)
+          expect(await token1.balanceOf(russia1.address)).to.equal(100*prices1[0]-100)
+          expect(await token1.balanceOf(russia2.address)).to.equal(200*prices1[0]+ 100)
+         
+          // другие варианты погашений
+          await token1.connect(russia1).redemption(russia2.address, resourceIds1[2], 500)
+          expect(await token1.balanceOf(russia1.address)).to.equal(100*prices1[0]-100 - 500)
+          expect(await token1.balanceOf(russia2.address)).to.equal(200*prices1[0]+ 100 + 500)
+
+          await token1.connect(russia2).redemption(russia3.address, resourceIds1[2], 1000)
+          expect(await token1.balanceOf(russia2.address)).to.equal(200*prices1[0]+100+500 - 1000)
+          expect(await token1.balanceOf(russia3.address)).to.equal(1000)
         });
     });
   });

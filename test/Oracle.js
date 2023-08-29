@@ -20,7 +20,7 @@ const resourceIds2 = [1, 2]
 const prices2 = [50, 100]
 const balances2 = [1000, 2000]
 
-/*
+
 describe("Oracle", function () {
     async function deployOracleFixture() {
         const factory = await ethers.deployContract("Factory")
@@ -122,4 +122,3 @@ describe("Oracle", function () {
         });
     });
 });
-*/
