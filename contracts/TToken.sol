@@ -175,6 +175,8 @@ contract TToken is TERC, ITToken {
         emit TopUpBalance(_msgSender(), nationalCurrency, toMint);
     }
 
+    // Оптимизация клиринга
+    // Сложное пополнение
     function topUpBalanceWithAnotherToken(
         address anotherToken,
         uint256 nationalCurrency, // to pay
@@ -261,7 +263,8 @@ contract TToken is TERC, ITToken {
      * So, before calling this function 'approve' on another TToken contract
      *   must be called first.
      */
-    // Может выполнять функцию ручного клиринга
+    // Оптимизация клиринга
+    // Сложный вывод
     function withdrawWithAnotherToken(
         address anotherToken,
         uint256 ttokens, 
